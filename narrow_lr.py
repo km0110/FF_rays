@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 
 import numpy as np
@@ -15,7 +15,7 @@ font = {'family' : 'normal',
 plt.rc('font', **font)
 
 
-# In[3]:
+# In[2]:
 
 
 def create_starting_optic(r,R,k=-1,N=100):
@@ -25,7 +25,7 @@ def create_starting_optic(r,R,k=-1,N=100):
     return optic
 
 
-# In[4]:
+# In[3]:
 
 
 def find_local_eq(h,optic,N=100):
@@ -55,7 +55,7 @@ def find_local_eq(h,optic,N=100):
     return cs
 
 
-# In[5]:
+# In[4]:
 
 
 def find_reflect_slope(norm):
@@ -151,7 +151,7 @@ def grad(i,epsilon,optic,exp_f,Nr):
 # In[9]:
 
 
-def plot_cdz(title,cdz):
+def plot_cdz(title,cdz,o_r):
     fig, ax = plt.subplots(figsize=(12,10))
     zeros=np.zeros((len(cdz),1))
     cdz=np.hstack((zeros,cdz))
@@ -178,11 +178,11 @@ def plot_cdz(title,cdz):
         ax.set_xticklabels(['{:d}'.format(x) for x in x_labels])
 
     plt.tight_layout()
-    plt.savefig(title+'_plot_cdz.png')
+    plt.savefig(title+'/'+title+'_plot_cdz.png')
     #plt.show()
 
 
-# In[1]:
+# In[10]:
 
 
 def plot_diff(title,o_z,o_r,r,R):
@@ -220,22 +220,23 @@ def plot_diff(title,o_z,o_r,r,R):
         ax.set_xticklabels(['{:d}'.format(x) for x in x_labels])
 
     plt.tight_layout()
-    plt.savefig(title + "_plot_diff.png")
+    plt.savefig(title+'/'+title+ "_plot_diff.png")
     #plt.show()
 
 
 # In[11]:
 
 
-def write_data(o_z,o_r,cost,cdz,title):
+def write_data(o_z,o_r,cost,cdz,grads,title):
     os.system('mkdir '+title)
     np.savetxt(title+'/'+title+"_o_z.csv",o_z)
     np.savetxt(title+'/'+title+"_o_r.csv",o_r)
     np.savetxt(title+'/'+title+"_cost.csv",cost)
     np.savetxt(title+'/'+title+"_cdz.csv",cdz)
+    np.savetxt(title+'/'+title+"_grads.csv",grads)
 
 
-# In[14]:
+# In[12]:
 
 
 def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-6,No=100,Nr=1000,plt=False,title=None):
@@ -254,6 +255,7 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
     #print(dzs)
     #print('Step: %d\t Cost: %f'%(n,cost[0]))
     o=start_o[1]
+    grads=[]
     while(n<n_iter and abs(diff)>tol):
         #print(change_dzs)
         #start_time=time.time()
@@ -267,17 +269,21 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
         cost.append(c)
         if plt:
             plot([o_r,o],rm,exp_f,title+"/step_%d"%(n),savefig=True)
+        gs=[]
         for i in range(len(dzs)):
-            step_size=learn_rate*grad(i,epsilon,[o_r,o],exp_f,Nr)
+            g=grad(i,epsilon,[o_r,o],exp_f,Nr)
+            step_size=learn_rate*g
             dzs[i]=dzs[i]-step_size
+            gs.append(g)
         diff=c
         cdz=np.vstack([cdz,dzs])
         #print(dzs)
+        grads.append(gs)
         print('Step:%d  \t Cost: %E \t time: %s'%(n,c,time.time()-start_time))
     
     runtime=time.time()-start_time
     title='dz-%1.e_k-%.2f_eps-%.1e_lr-%.1e_No-%d_Nr-%d_N-%d_t-%.2e'%(dz,start_k,epsilon,learn_rate,No,Nr,n_iter,runtime)
-    write_data(o_z,o_r,cost,cdz,title)
+    write_data(o_z,o_r,cost,cdz,grads,title)
     plot_cdz(title,cdz,o_r)
     plot_diff(title,o_z,o_r,r,R)
     print(title + " finished")
@@ -289,10 +295,17 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
 
 # Change in learning rate to 1e-2
 
+# In[13]:
+
+
+gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=10,Nr=100,No=100)
+print("Test Completed... Should work now....")
+
+
 # In[27]:
 
 
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=2000,Nr=100,No=100)
+#gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=2000,Nr=100,No=100)
 
 
 # In[27]:
