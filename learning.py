@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import numpy as np
@@ -15,7 +15,7 @@ font = {'family' : 'normal',
 plt.rc('font', **font)
 
 
-# In[2]:
+# In[ ]:
 
 
 def create_starting_optic(r,R,k=-1,N=100):
@@ -25,7 +25,7 @@ def create_starting_optic(r,R,k=-1,N=100):
     return optic
 
 
-# In[3]:
+# In[ ]:
 
 
 def find_local_eq(h,optic,N=100):
@@ -55,7 +55,7 @@ def find_local_eq(h,optic,N=100):
     return cs
 
 
-# In[4]:
+# In[ ]:
 
 
 def find_reflect_slope(norm):
@@ -64,7 +64,7 @@ def find_reflect_slope(norm):
     return slope
 
 
-# In[5]:
+# In[ ]:
 
 
 def raytrace(optic, exp_f, Nr=7, linsp=True):
@@ -91,7 +91,7 @@ def raytrace(optic, exp_f, Nr=7, linsp=True):
     return np.array(raymatrix),np.array(after)
 
 
-# In[6]:
+# In[ ]:
 
 
 def plot(optic,raymatrix,exp_f,title=None, lambda0=None, norm=False,savefig=False):
@@ -122,7 +122,7 @@ def plot(optic,raymatrix,exp_f,title=None, lambda0=None, norm=False,savefig=Fals
     plt.close()
 
 
-# In[7]:
+# In[ ]:
 
 
 def rms(rays_after):
@@ -130,7 +130,7 @@ def rms(rays_after):
     return np.sqrt(np.sum(rays_after**2)/n)
 
 
-# In[8]:
+# In[ ]:
 
 
 def grad(i,epsilon,optic,exp_f,Nr):
@@ -148,19 +148,20 @@ def grad(i,epsilon,optic,exp_f,Nr):
     return c1-c2
 
 
-# In[9]:
+# In[ ]:
 
 
 def plot_cdz(title,cdz,o_r):
-    fig, ax = plt.subplots(figsize=(20,10))
+    fig, ax = plt.subplots(figsize=(12,10))
     zeros=np.zeros((len(cdz),1))
     cdz=np.hstack((zeros,cdz))
     n_iter=len(cdz)
     if n_iter>100:
         steps=len(cdz)//100
-        cdz=cdz[::10]
+        cdz=cdz[::steps]
     im=ax.imshow(np.array(cdz).T,origin='lower')
-    ax.figure.colorbar(im,fraction=0.046, pad=0.04)
+    cbar=ax.figure.colorbar(im,fraction=0.046, pad=0.04, label=r'$\Delta dz$')
+    cbar.formatter.set_powerlimits((0, 0))
     plt.xlabel('iterations')
     plt.ylabel('r(m)')
     No=len(cdz[0])+1
@@ -181,26 +182,29 @@ def plot_cdz(title,cdz,o_r):
     #plt.show()
 
 
-# In[10]:
+# In[ ]:
 
 
 def plot_diff(title,o_z,o_r,r,R):
     oz=np.copy(o_z)*-1
-    fig, ax = plt.subplots(figsize=(15,10))
+    fig, ax = plt.subplots(figsize=(12,10))
     No=len(o_r)
     start_o=oz[0]
     end_o=create_starting_optic(r,R,k=-1,N=No)[1][1:]
-    total_change=end_o-start_o[1:]
+    #total_change=end_o+start_o[1:]
     exp_o=np.tile(end_o,(len(o_z),1))
+    #print(exp_o[0])
     oz[:,1:]+=exp_o
     #oz[:,1:]/=total_change
+    #print(oz[0])
     n_iter=len(oz)
     if n_iter>100:
         steps=len(oz)//100
-        oz=oz[::10]
+        oz=oz[::steps]
 
     im=ax.imshow(np.array(oz).T,origin='lower')
-    ax.figure.colorbar(im,fraction=0.046, pad=0.04)
+    cbar=ax.figure.colorbar(im,fraction=0.046, pad=0.04,label='K=-1 - current optic')
+    cbar.formatter.set_powerlimits((0, 0))
     plt.xlabel('iterations')
     plt.ylabel('r(m)')
     step=No//5
@@ -220,18 +224,20 @@ def plot_diff(title,o_z,o_r,r,R):
     #plt.show()
 
 
-# In[11]:
+# In[ ]:
 
 
-def write_data(o_z,o_r,cost,cdz,title):
+def write_data(o_z,o_r,cost,cdz,grads,after,title):
     os.system('mkdir '+title)
     np.savetxt(title+'/'+title+"_o_z.csv",o_z)
     np.savetxt(title+'/'+title+"_o_r.csv",o_r)
     np.savetxt(title+'/'+title+"_cost.csv",cost)
     np.savetxt(title+'/'+title+"_cdz.csv",cdz)
+    np.savetxt(title+'/'+title+"_grads.csv",grads)
+    np.savetxt(title+'/'+title+"_after.csv",after)
 
 
-# In[14]:
+# In[ ]:
 
 
 def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-6,No=100,Nr=1000,plt=False,title=None):
@@ -250,6 +256,8 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
     #print(dzs)
     #print('Step: %d\t Cost: %f'%(n,cost[0]))
     o=start_o[1]
+    grads=[]
+    after=[]
     while(n<n_iter and abs(diff)>tol):
         #print(change_dzs)
         #start_time=time.time()
@@ -259,128 +267,49 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
         o[1:]+=dzs
         o_z=np.vstack([o_z,o])
         rm,af=raytrace([o_r,o],exp_f,Nr)
+        after.append(af)
         c=rms(af)
         cost.append(c)
         if plt:
             plot([o_r,o],rm,exp_f,title+"/step_%d"%(n),savefig=True)
+        gs=[]
         for i in range(len(dzs)):
-            step_size=learn_rate*grad(i,epsilon,[o_r,o],exp_f,Nr)
+            g=grad(i,epsilon,[o_r,o],exp_f,Nr)
+            step_size=learn_rate*g
             dzs[i]=dzs[i]-step_size
+            gs.append(g)
         diff=c
         cdz=np.vstack([cdz,dzs])
         #print(dzs)
+        grads.append(gs)
         print('Step:%d  \t Cost: %E \t time: %s'%(n,c,time.time()-start_time))
     
     runtime=time.time()-start_time
     title='dz-%1.e_k-%.2f_eps-%.1e_lr-%.1e_No-%d_Nr-%d_N-%d_t-%.2e'%(dz,start_k,epsilon,learn_rate,No,Nr,n_iter,runtime)
-    write_data(o_z,o_r,cost,cdz,title)
+    write_data(o_z,o_r,cost,cdz,grads,after,title)
     plot_cdz(title,cdz,o_r)
     plot_diff(title,o_z,o_r,r,R)
     print(title + " finished")
     print(time.strftime("%H:%M:%S", time.gmtime(runtime)))
-    return np.array(o_z),o_r,cost,cdz
+    #return np.array(o_z),o_r,cost,cdz
 
 
 # Default 
 
-# In[27]:
+# In[ ]:
 
 
-#gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-3,n_iter=100,Nr=100,No=100)
+learn_rate=np.linspace(1e-2,1e-1,10)
+num_opt=[10,20,50,100]
 
 
-# In[27]:
+# In[ ]:
 
 
-#gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-3,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-#gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-3,n_iter=1000,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-3,n_iter=1000,Nr=100,No=100)
-
-
-# Change in learning rate to 1e-2
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=1000,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-2,n_iter=1000,Nr=100,No=100)
-
-
-# Change in learning rate to 1e-1
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-1,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-1,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1e-1,n_iter=1000,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1e-1,n_iter=1000,Nr=100,No=100)
-
-
-# Change in learning rate to 1
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1,n_iter=100,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,1,n_iter=1000,Nr=100,No=100)
-
-
-# In[27]:
-
-
-gradient_descent(1e-7,0,-0.5,0.0375,0.1125,0.05625,1,n_iter=1000,Nr=100,No=100)
+for no in num_opt:
+    for lr in learn_rate:
+        nr=no
+        gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
+        nr=no//2
+        gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
 
