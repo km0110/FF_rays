@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import numpy as np
 import time
+import imageio
 from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 import os
@@ -15,7 +16,7 @@ font = {'family' : 'normal',
 plt.rc('font', **font)
 
 
-# In[ ]:
+# In[2]:
 
 
 def create_starting_optic(r,R,k=-1,N=100):
@@ -25,7 +26,7 @@ def create_starting_optic(r,R,k=-1,N=100):
     return optic
 
 
-# In[ ]:
+# In[3]:
 
 
 def find_local_eq(h,optic,N=100):
@@ -55,7 +56,7 @@ def find_local_eq(h,optic,N=100):
     return cs
 
 
-# In[ ]:
+# In[4]:
 
 
 def find_reflect_slope(norm):
@@ -64,7 +65,7 @@ def find_reflect_slope(norm):
     return slope
 
 
-# In[ ]:
+# In[5]:
 
 
 def raytrace(optic, exp_f, Nr=7, linsp=True):
@@ -91,7 +92,7 @@ def raytrace(optic, exp_f, Nr=7, linsp=True):
     return np.array(raymatrix),np.array(after)
 
 
-# In[ ]:
+# In[6]:
 
 
 def plot(optic,raymatrix,exp_f,title=None, lambda0=None, norm=False,savefig=False):
@@ -122,7 +123,7 @@ def plot(optic,raymatrix,exp_f,title=None, lambda0=None, norm=False,savefig=Fals
     plt.close()
 
 
-# In[ ]:
+# In[7]:
 
 
 def rms(rays_after):
@@ -130,7 +131,7 @@ def rms(rays_after):
     return np.sqrt(np.sum(rays_after**2)/n)
 
 
-# In[ ]:
+# In[8]:
 
 
 def grad(i,epsilon,optic,exp_f,Nr):
@@ -148,7 +149,7 @@ def grad(i,epsilon,optic,exp_f,Nr):
     return c1-c2
 
 
-# In[ ]:
+# In[9]:
 
 
 def plot_cdz(title,cdz,o_r):
@@ -182,7 +183,7 @@ def plot_cdz(title,cdz,o_r):
     #plt.show()
 
 
-# In[ ]:
+# In[10]:
 
 
 def plot_diff(title,o_z,o_r,r,R):
@@ -224,11 +225,24 @@ def plot_diff(title,o_z,o_r,r,R):
     #plt.show()
 
 
-# In[ ]:
+# In[11]:
+
+
+def plot_rms(title,cost):
+    plt.figure(figsize=(15,10))
+    plt.plot(cost)
+    plt.xlabel('iterations')
+    plt.ylabel('rms')
+    plt.tight_layout()
+    plt.savefig(title+'/'+title+"_plot_rms.png")
+    #plt.show()
+    plt.close()
+
+
+# In[12]:
 
 
 def write_data(o_z,o_r,cost,cdz,grads,after,title):
-    os.system('mkdir '+title)
     np.savetxt(title+'/'+title+"_o_z.csv",o_z)
     np.savetxt(title+'/'+title+"_o_r.csv",o_r)
     np.savetxt(title+'/'+title+"_cost.csv",cost)
@@ -237,7 +251,19 @@ def write_data(o_z,o_r,cost,cdz,grads,after,title):
     np.savetxt(title+'/'+title+"_after.csv",after)
 
 
-# In[ ]:
+# In[13]:
+
+
+def create_gif(title,n_iter):
+    writer = imageio.get_writer(title+'/'+title+'_raytrace.mp4', fps=10)
+    for i in range(n_iter+1):
+        f=title+'/raytrace/step_%d.png'%i
+        im=imageio.imread(f)
+        writer.append_data(im)
+    writer.close()
+
+
+# In[14]:
 
 
 def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-6,No=100,Nr=1000,plt=False,title=None):
@@ -248,8 +274,13 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
     rm0,af0=raytrace(start_o,exp_f,Nr)
     cost=[rms(af0)]
     n=0
+    title='dz-%1.e_k-%.2f_eps-%.1e_lr-%.1e_No-%d_Nr-%d_N-%d'%(dz,start_k,epsilon,learn_rate,No,Nr,n_iter)
+    os.system('mkdir '+title)
+
     if plt:
-        plot(start_o,rm0,exp_f,title+"/step_%d"%(n),savefig=True)
+        plot_title=title+"/raytrace"
+        os.system('mkdir '+plot_title)
+        plot(start_o,rm0,exp_f,plot_title+"/step_%d"%(n),savefig=True)
     diff=cost[0]
     dzs=np.ones(No-1)*dz
     cdz=np.array(dzs)
@@ -271,7 +302,8 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
         c=rms(af)
         cost.append(c)
         if plt:
-            plot([o_r,o],rm,exp_f,title+"/step_%d"%(n),savefig=True)
+            plot_title=title+"/raytrace"
+            plot(start_o,rm,exp_f,plot_title+"/step_%d"%(n),savefig=True)
         gs=[]
         for i in range(len(dzs)):
             g=grad(i,epsilon,[o_r,o],exp_f,Nr)
@@ -285,10 +317,11 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
         print('Step:%d  \t Cost: %E \t time: %s'%(n,c,time.time()-start_time))
     
     runtime=time.time()-start_time
-    title='dz-%1.e_k-%.2f_eps-%.1e_lr-%.1e_No-%d_Nr-%d_N-%d_t-%.2e'%(dz,start_k,epsilon,learn_rate,No,Nr,n_iter,runtime)
     write_data(o_z,o_r,cost,cdz,grads,after,title)
     plot_cdz(title,cdz,o_r)
     plot_diff(title,o_z,o_r,r,R)
+    plot_rms(title,cost)
+    create_gif(title,n_iter)
     print(title + " finished")
     print(time.strftime("%H:%M:%S", time.gmtime(runtime)))
     #return np.array(o_z),o_r,cost,cdz
@@ -299,17 +332,65 @@ def gradient_descent(epsilon,dz,start_k,r,R,exp_f,learn_rate,n_iter=1000,tol=1e-
 # In[ ]:
 
 
-learn_rate=np.linspace(1e-2,1e-1,10)
-num_opt=[10,20,50,100]
+#gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,0.03,n_iter=5000,Nr=20,No=20,plt=True)
 
 
 # In[ ]:
 
 
-for no in num_opt:
-    for lr in learn_rate:
-        nr=no
-        gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
-        nr=no//2
-        gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
+#gradient_descent(1e-7,5e-7,-1.5,0.0375,0.1125,0.05625,0.03,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,0.02,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+#gradient_descent(1e-7,5e-7,-1.5,0.0375,0.1125,0.05625,0.02,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+#gradient_descent(1e-7,5e-7,0,0.0375,0.1125,0.05625,0.03,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+#gradient_descent(1e-7,5e-7,-2,0.0375,0.1125,0.05625,0.03,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+#gradient_descent(1e-7,5e-7,0,0.0375,0.1125,0.05625,0.02,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+#gradient_descent(1e-7,5e-7,-2,0.0375,0.1125,0.05625,0.02,n_iter=5000,Nr=20,No=20,plt=True)
+
+
+# In[ ]:
+
+
+# learn_rate=np.linspace(1e-2,1e-1,10)
+# num_opt=[10,20,50,100]
+
+
+# In[ ]:
+
+
+# for no in num_opt:
+#     for lr in learn_rate:
+#         nr=no
+#         gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
+#         nr=no/2
+#         gradient_descent(1e-7,5e-7,-0.5,0.0375,0.1125,0.05625,lr,n_iter=2000,Nr=nr,No=no)
 
